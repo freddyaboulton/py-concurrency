@@ -2,33 +2,58 @@ from multiprocessing import Queue
 import time
 from workers.WikiWorker import WikiWorker
 from workers.YahooFinanceWorker import YahooFinancePriceScheduler
-
+from workers.PostgresWorker import PostgresMasterScheduler
+from yaml_reader import YamlPipelineExecutor
 
 def sleep_a_little(seconds):
     time.sleep(seconds)
 
 def main():
-    symbol_queue = Queue()
-    calc_start_time = time.time()
+    pipeline_location = "pipelines/wiki_yahoo_pipeline.yaml"
+    pipeline = YamlPipelineExecutor(pipeline_location)
+    
+    pipeline.process_pipeline()
 
     wiki_worker = WikiWorker()
-    threads = []
-    n_threads = 4
-    
-    for _ in range(n_threads):
-        scheduler = YahooFinancePriceScheduler(queue=symbol_queue)
-        scheduler.start()
-        threads.append(scheduler)
-    
-    for symbol in wiki_worker.get_sp_500_companies():
-        symbol_queue.put(symbol)
-    
-    
-    for _ in threads:
-        symbol_queue.put("DONE")
 
-    [t.join() for t in threads]
-    print(f"Extracting prices took {round(time.time() - calc_start_time, 1)}")
+    symbol_counter = 0
+    for symbol in wiki_worker.get_sp_500_companies():
+        pipeline._queues['SymbolQueue'].put(symbol)
+        symbol_counter += 1
+        if symbol_counter >= 5:
+            break
+    
+    for _ in range(20):
+        pipeline._queues['SymbolQueue'].put("DONE")
+
+    pipeline._join_workers()
+    
+    # symbol_queue = Queue()
+    # postgres_queue = Queue()
+    # calc_start_time = time.time()
+
+    # wiki_worker = WikiWorker()
+    # threads = []
+    # n_threads = 4
+    
+    # for _ in range(n_threads):
+    #     scheduler = YahooFinancePriceScheduler(queue=symbol_queue, output_queue=postgres_queue)
+    #     threads.append(scheduler)
+    
+    # postgres_scheduler_threads = []
+    # n_postgres_workers = 2
+    # for _ in range(n_postgres_workers):
+    #     postgres_scheduler = PostgresMasterScheduler(queue=postgres_queue)
+    #     postgres_scheduler_threads.append(postgres_scheduler)
+    
+    # for symbol in wiki_worker.get_sp_500_companies():
+    #     symbol_queue.put(symbol)
+    
+    # for _ in threads:
+    #     symbol_queue.put("DONE")
+
+    # [t.join() for t in threads]
+    # print(f"Extracting prices took {round(time.time() - calc_start_time, 1)}")
 
     
     #     price_worker = YahooFinanceWorker(symbol)

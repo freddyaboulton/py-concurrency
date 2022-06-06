@@ -3,21 +3,30 @@ import requests
 from lxml import html
 import time
 import random
-
+import datetime
 
 class YahooFinancePriceScheduler(threading.Thread):
-    def __init__(self, queue, **kwargs) -> None:
-        super().__init__()
+    def __init__(self, queue, output_queue, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._queue = queue
+        self._output_queue = output_queue
+        self.start()
+
     
     def run(self):
         while True:
             val = self._queue.get()
             if val == "DONE":
+                if self._output_queue is not None:
+                    self._output_queue.put("DONE")
                 break
             worker = YahooFinanceWorker(symbol=val)
             price = worker.get_price()
-            print(price)
+            if self._output_queue is not None:
+                insert_time = datetime.datetime.fromtimestamp(time.time())
+                output = (val, price, insert_time)
+                print(output)
+                self._output_queue.put(output)
             time.sleep(random.random())
 
 

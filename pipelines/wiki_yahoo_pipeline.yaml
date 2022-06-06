@@ -1,0 +1,31 @@
+queues:
+  - name: SymbolQueue
+    description: Symbols to be scrapped
+  
+  - name: PostgresQueue
+    description: contains data that needs to be added to Postgres
+
+workers:
+  # - name: WikiWorker
+  #   location: workers.WikiWorker
+  #   class: WikiWorker
+  #   input_values:
+  #     - "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+  #   output_queues:
+  #     - SymbolQueue
+
+  - name: YahooFinanceWorker
+    description: pulls price for symbol from yahoo finance
+    location: workers.YahooFinanceWorker
+    class: YahooFinancePriceScheduler
+    instances: 4
+    input_queue: SymbolQueue
+    output_queue: PostgresQueue
+  
+  - name: PostgresWorker
+    description: save data to db
+    location: workers.PostgresWorker
+    class: PostgresMasterScheduler
+    instances: 6
+    input_queue: PostgresQueue
+
